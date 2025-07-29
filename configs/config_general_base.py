@@ -3,16 +3,17 @@ batch_size = 8  # batch size
 lr = 0.0001  # learning rate
 total_iters = 1000000  # total iterations
 iters_per_epoch = 10000  # number of iterations approximately in every epoch
-compile_model = False  # compile the model for faster training (will require ~10 minutes of compilation time only on first run)
+compile_model = True  # compile the model for faster training (will require ~10 minutes of compilation time only on first run)
 num_workers = 16  # number of dataloader workers
 multi_gpu = False  # use DistributedDataParallel multi-gpu training, to be used with torchrun
 
 data_paths = [
-    "/data/nils/datasets/jamendo/audio"
+    #"/data/nils/datasets/jamendo/audio"
+    "/scratch/users/nshaheed/mtg-jamendo/"
 ]  # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
 db_paths = None  #, "/data/nils/datasets/drums/export/expended_gmd/audio_44k", "/data/nils/datasets/drums/export/darbouka/audio_44k","/data/nils/datasets/drums/export/breaks/audio_44k","/data/nils/datasets/electronic/canblast/audio_44k", "/data/nils/datasets/music_dataset_copy/lofi/", "/data/nils/datasets/music_dataset_copy/rock/","/data/nils/datasets/music_dataset_copy/dub/", "/data/nils/datasets/music_dataset_copy/jazz/","/data/nils/datasets/raw/audio_44k","/data/nils/datasets/instruments/export/maestro-v3.0.0/", "/data/nils/datasets/instruments/export/slakh/", "/data/nils/datasets/instruments/export/violin/", "/data/nils/datasets/instruments/export/guitarset","/data/nils/datasets/electronic/techno_dataset_v2/audio_44k"] #
 data_fractions = None  # list of sampling weights of each dataset (if None, equal sampling weights)
-data_path_test = '/data/nils/datasets/jamendo/audio/00'  # path of samples used for FAD testing (e.g. musiccaps)
+data_path_test = '/scratch/users/nshaheed/mtg-jamendo/00'  # path of samples used for FAD testing (e.g. musiccaps)
 data_extensions = [
     '.wav', '.flac', '.mp3'
 ]  # list of extensions of audio files to search for in the given paths
@@ -31,6 +32,7 @@ mixed_precision = True  # use mixed precision (float16)
 seed = 42  # seed for Pytorch and Numpy
 
 load_path = None  #"/data/nils/repos/codecs_benchmark/music2latent/checkpoints/2025-06-18 12:54:10.105176/model_fid_10000000.0_loss_90.013_iters_50800.pt"                                                          # load checkpoint from this path
+# load_path = '/home/groups/brg/nshaheed/music2latent-streaming/checkpoints/2025-07-23 17:51:39.310133/model_fid_6.603539579139746_loss_117.53_iters_40000.pt'
 load_iter = True  # if False, reset the scheduler and start from iteration 0
 load_ema = True  # if False, do not load the EMA weights from checkpoint
 load_optimizer = True  # if False, do not load the optimizer parameters from checkpoint (helps in case of resuming collapsed run)
@@ -120,3 +122,5 @@ rho = 7.  # rho parameter for EDM framework
 use_lognormal = True  # use a lognormal noise schedule during training
 p_mean = -1.1  # mean of lognormal noise schedule
 p_std = 2.  # standard deviation of lognormal noise schedule
+
+config = '' # empty config arg as a workaround

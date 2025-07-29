@@ -9,6 +9,7 @@ import numpy as np
 from .hparams import hparams
 
 from torch.utils.data.distributed import DistributedSampler
+import torchaudio
 
 class TestAudioDataset(Dataset):
     def __init__(self, wav_path, hop, fac, data_length, tot_samples=None, random_sampling=True):
@@ -33,16 +34,26 @@ class TestAudioDataset(Dataset):
         return int(self.tot_samples)
 
     def __getitem__(self, idx):
+        # print(idx)
+        # if (idx == 425):
+        #     breakpoint()
+        # idx = 472
+        # if (idx == 472):
+        #     breakpoint()
         if idx>(self.data_samples*self.num_repetitions):
             idx = torch.randint(self.data_samples, size=(1,)).item()
         else:
             idx = idx%self.data_samples
         path = self.paths[idx]
         try:
+            # breakpoint()
+            # wv,_ = torchaudio.load(path)
             wv,_ = sf.read(path, dtype='float32', always_2d=True)
+            # wv = wv.transpose(0,1)
             if wv.shape[0]<self.wv_length:
                 idx = torch.randint(self.tot_samples, size=(1,)).item()
                 return self.__getitem__(idx)
+            # breakpoint()
             wv = torch.from_numpy(wv)
             # convert to mono
             if wv.shape[-1]>1:

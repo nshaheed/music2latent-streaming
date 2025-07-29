@@ -56,7 +56,6 @@ class Trainer:
         self.step = 0
         
         
-        
         # INITIALIZE CHECKPOINT FOLDER
         if misc.get_rank()==0:
             if self.save_path is None:
@@ -70,6 +69,8 @@ class Trainer:
                     
                 
             self.writer = SummaryWriter(log_dir=self.save_path)
+
+        # breakpoint()
 
 
     @torch.compile(mode='max-autotune-no-cudagraphs', disable=not hparams.compile_model)
@@ -389,6 +390,7 @@ class Trainer:
 
 
 def main(config_file):
+    # breakpoint()
     trainer = Trainer(config_file = config_file)
     trainer.train()
     if hparams.multi_gpu:

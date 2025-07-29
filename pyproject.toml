@@ -1,0 +1,36 @@
+[project]
+name = "music2latent-streaming"
+version = "0.1.0"
+description = "cached-conv streaming adaption of music2latent"
+requires-python = ">=3.9.0"
+readme = "README.md"
+dependencies = [
+    "acids-rave>=2.3.1",
+    "huggingface-hub>=0.33.4",
+    "laion-clap>=1.1.7",
+    "librosa>=0.11.0",
+    "matplotlib>=3.9.4",
+    "resampy>=0.4.3",
+    "soundfile>=0.13.1",
+    "torch==2.5.1",
+    "torchaudio==2.5.1",
+    "torchvision==0.20.1",
+    "tqdm>=4.67.1",
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchvision = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+torchaudio = [
+  { index = "pytorch-cu124", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
