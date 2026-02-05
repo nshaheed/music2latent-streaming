@@ -32,3 +32,7 @@ def compute_fad(fad_path):
         scores.append(score)
         
     return scores
+
+
+if __name__ == "__main__":
+    compute_fad('')

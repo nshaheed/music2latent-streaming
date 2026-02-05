@@ -60,14 +60,15 @@ class Trainer:
 
 
     @torch.compile(mode='max-autotune-no-cudagraphs', disable=not hparams.compile_model)
-    def forward_pass_consistency(self, data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas):
+    def forward_pass_consistency(self, data_encoder, data_env, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas):
 
         with torch.autocast(device_type='cuda', dtype=torch.float16, enabled=hparams.mixed_precision):
 
             if hparams.multi_gpu:
                 fdata, fdata_plus_one = self.ddp(data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
             else:
-                fdata, fdata_plus_one = self.gen(data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
+                breakpoint()
+                fdata, fdata_plus_one = self.gen(data_encoder, data_env, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
             
             loss_weight = get_loss_weight(sigmas, sigmas_step)
             loss = huber(fdata,fdata_plus_one,loss_weight)
@@ -75,9 +76,23 @@ class Trainer:
 
 
     def train_it(self, wv):
+        # flatten spectrum and get envelope
+        _, flattened_wv = extract_spectrum(wv)
 
-        data = to_representation(wv)
-        data_encoder = to_representation_encoder(wv)
+        # performs stft on the wavform
+        data = to_representation(flattened_wv)
+        data_encoder = to_representation_encoder(flattened_wv)
+
+        # breakpoint()
+        env_len = hparams.hop * hparams.data_length
+        env_wv = wv[:,:env_len]
+        _, _, data_env = extract_envelope(env_wv, target_length=hparams.data_length)
+        # reshape to add a channel dim
+        data_env = data_env.unsqueeze(1)
+
+        fig = plot_training_run(wv, flattened_wv, data_env)
+        self.writer.add_figure(f"figs/tr_steps", fig, global_step=self.it)
+        # breakpoint()
 
         step = get_step_schedule(min(self.it,hparams.total_iters))
         self.step = step
@@ -99,8 +114,16 @@ class Trainer:
         noisy_samples_plus_one = add_noise(data, noises, sigmas)
 
         with misc.ddp_sync(self.ddp, ((self.it+1) % hparams.accumulate_gradients==0) or (self.it+1==len(self.dl))):
-            loss = self.forward_pass_consistency(data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
+            loss = self.forward_pass_consistency(data_encoder, data_env, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
         self.scaler.scale(loss.float()).backward()
+
+        if not torch.isfinite(loss):
+            raise RuntimeError("Non-finite loss")
+
+        if loss == 0:
+            raise RuntimeError("Zero loss — invalid state")
+
+
         loss = loss.detach().cpu().item()
 
         grad_norm = get_grad_norm(self.gen.parameters())
@@ -119,6 +142,35 @@ class Trainer:
 
         return loss
 
+    def forward_loss(self, wv):
+        ## for lr range finder
+        _, flattened_wv = extract_spectrum(wv)
+        data = to_representation(flattened_wv)
+        data_encoder = to_representation_encoder(flattened_wv)
+
+        env_len = hparams.hop * hparams.data_length
+        env_wv = wv[:, :env_len]
+        _, _, data_env = extract_envelope(env_wv, target_length=hparams.data_length)
+        data_env = data_env.unsqueeze(1)
+
+        inds = torch.rand((data.shape[0],), device=data.device)
+        sigmas = get_sigma_continuous(inds)
+        sigmas_step = get_sigma_continuous(get_step_continuous(inds, 0))
+
+        noises = torch.randn_like(data)
+        noisy = add_noise(data, noises, sigmas_step)
+        noisy_plus = add_noise(data, noises, sigmas)
+
+        loss = self.forward_pass_consistency(
+            data_encoder,
+            data_env,
+            noisy,
+            noisy_plus,
+            sigmas_step,
+            sigmas,
+        )
+
+        return loss
 
     def train(self):
 
@@ -136,10 +188,11 @@ class Trainer:
                 pbar = self.dl
 
             for batchi,(x) in enumerate(pbar):
-
+                # breakpoint()
                 self.update_learning_rate()
                 
                 loss = self.train_it(x.to(self.device))
+                print(f"{loss=}, {self.optimizer.param_groups[0]['lr']}")
                 if misc.get_rank()==0:
                     self.writer.add_scalar('epoch', self.epoch, self.it)
                     self.writer.add_scalar('learning rate', self.optimizer.param_groups[0]['lr'], self.it)
@@ -153,8 +206,9 @@ class Trainer:
             
             self.epoch = self.epoch + 1
             if misc.get_rank()==0:
-                self.calculate_fad(hparams.inference_diffusion_steps)
-                self.save_checkpoint(np.mean(loss_list[-g:]))
+                if hparams.num_samples_fad != 0:
+                    self.calculate_fad(hparams.inference_diffusion_steps)
+                    self.save_checkpoint(np.mean(loss_list[-g:]))
                 if hparams.enable_ema:
                     with self.ema.average_parameters():
                         self.test_model()

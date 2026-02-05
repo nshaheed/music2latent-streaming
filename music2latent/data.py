@@ -132,6 +132,9 @@ class AudioDataset(Dataset):
             # if not stereo:
             wv = wv[torch.randint(wv.shape[0], size=(1,)).item(),:]
 
+            # TODO calc envelope instead of random
+            env = 0
+
             rms = torch.sqrt(torch.mean(wv**2))
             if rms < self.rms_min:
                 idx = torch.randint(self.tot_samples, size=(1,)).item()

@@ -5,6 +5,7 @@ import torchaudio
 import librosa
 import matplotlib.pyplot as plt
 
+from scipy.signal import hilbert, butter, filtfilt
 from .hparams import hparams
 
 
@@ -190,21 +191,224 @@ def plot_audio(wv):
         axs[ind].set_title('Mel-Spectrogram')
     return fig
 
-def plot_audio_compare(wv1,wv2):
+# def plot_audio_compare(wv1,wv2):
+#     spec1 = []
+#     spec2 = []
+#     for w1,w2 in zip(wv1,wv2):
+#         spec1.append(wv2mel(w1.unsqueeze(0)).squeeze(0)[..., :1024])
+#         spec2.append(wv2mel(w2.unsqueeze(0)).squeeze(0)[..., :1024])
 
+#     fig, axs = plt.subplots(nrows=len(spec1), ncols=2, figsize=(5*len(spec1),10))
+
+#     for ind in range(len(spec1)):
+
+#         axs[ind][0].imshow(np.flip(spec1[ind].cpu().numpy(), -2), cmap=None)
+#         axs[ind][0].axis('off')
+
+#         axs[ind][1].imshow(np.flip(spec2[ind].cpu().numpy(), -2), cmap=None)
+#         axs[ind][1].axis('off')
+#     return fig
+
+def plot_training_run(wv, flat_wv, env_wv):
+    spec_wv = wv2mel(wv)
+    spec_flat_wv = wv2mel(flat_wv)
+
+    fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(5, 10))    
+
+    # breakpoint()
+    axs[0].imshow(np.flip(spec_wv[0].cpu().numpy(), -2))
+    axs[0].axis('off')
+    axs[1].imshow(np.flip(spec_flat_wv[0].cpu().numpy(), -2))
+    axs[1].axis('off')
+
+    # 1. Define the x-axis based on the original waveform length
+    x_orig = np.arange(wv.shape[-1])
+
+    # 2. Define the x-axis for the current envelope (spread across the same range)
+    # We map the indices of env_wv to the full range of x_orig
+    x_env_current = np.linspace(0, wv.shape[-1] - 1, num=env_wv.shape[-1])
+
+    # 3. Interpolate env_wv to match the length of wv
+    env_interp = np.interp(x_orig, x_env_current, env_wv[0][0].cpu().numpy())
+
+    # axs[2].plot(np.arange(wv.shape[-1]), wv[0].cpu().numpy())    
+    # axs[3].plot(np.arange(env_wv.shape[-1]), env_wv[0][0].cpu().numpy())
+
+    axs[2].plot(x_orig, wv[0].cpu().numpy(), label='Waveform', alpha=0.7)
+    axs[2].plot(x_orig, env_interp, label='Envelope', linewidth=2)
+    axs[2].legend()
+
+    return fig
+
+def plot_audio_compare(wv1, wv2):
     spec1 = []
     spec2 = []
-    for w1,w2 in zip(wv1,wv2):
+    spec3 = []
+    envs = []
+    wv3 = []
+    
+    for w1, w2 in zip(wv1, wv2):
         spec1.append(wv2mel(w1.unsqueeze(0)).squeeze(0)[..., :1024])
         spec2.append(wv2mel(w2.unsqueeze(0)).squeeze(0)[..., :1024])
 
-    fig, axs = plt.subplots(nrows=len(spec1), ncols=2, figsize=(5*len(spec1),10))
+        # breakpoint()
+        _, flattened_w1 = extract_spectrum(w1.unsqueeze(0))
+        spec3.append(wv2mel(flattened_w1).squeeze(0)[..., :1024])
+        wv3.append(flattened_w1)
+
+        aud_env, smooth_env, env = extract_envelope(w1.unsqueeze(0), target_length=1024, cutoff_freq=30)
+        envs.append(env)
+        # breakpoint()
+
+    fig, axs = plt.subplots(nrows=len(spec1), ncols=5, figsize=(5 * len(spec1), 10))
 
     for ind in range(len(spec1)):
-
-        axs[ind][0].imshow(np.flip(spec1[ind].cpu().numpy(), -2), cmap=None)
+        axs[ind][0].imshow(np.flip(spec1[ind].cpu().numpy(), -2))
         axs[ind][0].axis('off')
 
-        axs[ind][1].imshow(np.flip(spec2[ind].cpu().numpy(), -2), cmap=None)
+
+        axs[ind][1].imshow(np.flip(spec2[ind].cpu().numpy(), -2))
         axs[ind][1].axis('off')
+
+        axs[ind][3].imshow(np.flip(spec3[ind].cpu().numpy(), -2))
+        axs[ind][3].axis('off')
+
+        # envelope column
+        # axs[ind][2].imshow(envs[ind].cpu().numpy()[None, :])
+        # breakpoint()
+        axs[ind][2].plot(np.arange(envs[ind].shape[-1]), envs[ind][-1].cpu().numpy())
+        # axs[ind][2].axis('off')
+
+        axs[ind][4].plot(np.arange(wv3[ind].shape[-1]), wv3[ind][-1].cpu().numpy())
+
     return fig
+
+def extract_envelope(wv, target_length=64, cutoff_freq=30):
+    """
+    Extract a fixed-length temporal envelope from an audio file.
+
+    Parameters:
+    -----------
+    filepath : str
+        Path to the WAV file
+
+    target_length : int
+        Desired length of the output envelope (default: 2048)
+
+    cutoff_freq : float
+        Cutoff frequency for the lowpass filter in Hz (default: 30)
+
+
+    Returns:
+    --------
+    tuple
+        (original_envelope, smoothed_envelope, resampled_envelope)
+    """
+    # sample_rate, audio = wavfile.read(filepath)
+    device = wv.device
+    audio = wv.cpu().numpy()
+
+    # Convert to mono if stereo (shouldn't need)
+    # if len(audio.shape) > 1:
+    #     audio = np.mean(audio, axis=1)
+
+    # Normalize audio
+    # audio = audio.astype(float) / np.max(np.abs(audio))
+
+    # Calculate temporal envelope using Hilbert transform
+    analytic_signal = hilbert(audio)
+    envelope = np.abs(analytic_signal)
+
+    # assume 44.1kHz sample rate (this won't matter too much in reality as:
+    #  normalized_cutoff = 30 / 22050 = 0.00136
+    #  normalized_cutoff = 30 / 24000 = 0.00125
+    # this is only an 8.8% difference in cutoff frequency from 44.1k vs 48k
+    sample_rate = 44100
+
+    # Design and apply lowpass filter
+    nyquist = sample_rate / 2
+    normalized_cutoff = cutoff_freq / nyquist
+    b, a = butter(4, normalized_cutoff, btype='low')
+    smoothed_envelope = filtfilt(b, a, envelope)
+
+    # the nyquist frequency for 44100 is (86.13/2) = 43
+    #                       for 48000 is (93.75/2) = 47
+    # so I'm not too worried about aliasing
+
+
+    # # Resample to target length
+    # batch, samps = smoothed_envelope.shape
+
+    # original_indices = np.linspace(0, samps - 1, samps)
+    # target_indices = np.linspace(0, samps - 1, target_length)
+
+    # resampled_envelope = np.interp(
+    #     target_indices,
+    #     original_indices,
+    #     smoothed_envelope.reshape(-1, samps)
+    # ).reshape(batch, target_length)
+
+    # original_indices = np.linspace(0, len(smoothed_envelope)-1, len(smoothed_envelope))
+    # target_indices = np.linspace(0, len(smoothed_envelope)-1, target_length)
+    # resampled_envelope = np.interp(target_indices, original_indices, smoothed_envelope)
+    
+    batch, samps = smoothed_envelope.shape
+
+    original_indices = np.linspace(0, samps - 1, samps)
+    target_indices = np.linspace(0, samps - 1, target_length)
+
+    resampled_envelope = np.empty((batch, target_length), dtype=smoothed_envelope.dtype)
+
+    for b in range(batch):
+        resampled_envelope[b] = np.interp(
+            target_indices,
+            original_indices,
+            smoothed_envelope[b]
+        )
+
+    # we only care about the resampled one for now
+    resampled_envelope = torch.from_numpy(resampled_envelope).to(torch.float32).to(device)
+    return envelope, smoothed_envelope, resampled_envelope
+
+
+def extract_spectrum(audio):
+    """
+    Extract the spectrum of the audio by flattening it's envelope
+
+    Parameters:
+    -----------
+    filepath : str
+        Path to the WAV file
+    target_length : int
+        Desired length of the output envelope (default: 2048)
+    cutoff_freq : float
+        Cutoff frequency for the lowpass filter in Hz (default: 30)
+    plot : bool
+        Whether to create visualization plots (default: True)
+
+    Returns:
+    --------
+    tuple
+        (original_envelope, smoothed_envelope, resampled_envelope)
+    """
+
+    # question: who to flatten? Julius defines flattening the spectrum as:
+    # dividing the spectrum of each carrier frame by its own spectral envelope, thereby flattening it.
+    # however, this is applying the *spectral* envelope of the signal, but the paper I'm basing things
+    # off of applies *temporal* envelopes. I think that this is good justification for trying a neural
+    # net based approach rather than just fucking around like I'm doing now, but I'm going to try
+    # the basic thing first and flatten the audio by it's temporal envelope
+
+    # Convert to mono if stereo
+    # if len(audio.shape) > 1:
+    #     audio = np.mean(audio, axis=1)
+
+    # Normalize audio
+    audio = audio / torch.max(torch.abs(audio))
+    
+    envelope, smooth, resamp = extract_envelope(audio)
+
+    # divide audio by envelope - should flatten?
+    flattened_audio = audio / torch.from_numpy(envelope).to(audio.device)
+
+    return audio, flattened_audio

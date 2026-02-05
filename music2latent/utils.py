@@ -208,9 +208,25 @@ def encode_decode(model, dataset, num_samples=9, diffusion_steps=1):
     real = []
     fake = []
     for x in tqdm(islice(dataloader, num_samples)):
-        repr_encoder = to_representation_encoder(x.to(device))
-        latent = model.encoder(repr_encoder)
-        generated_samples = generate(model, diffusion_steps=diffusion_steps, latents=latent)
+        _, flattened_x = extract_spectrum(x)
+
+        repr_encoder = to_representation_encoder(flattened_x.to(device))
+        latents_enc = model.encoder(repr_encoder)
+
+        target_len=repr_encoder.shape[-1]
+        env_len = hparams.hop * target_len
+        env_wv = x[:,:env_len]
+        _, _, data_env = extract_envelope(env_wv, target_length=target_len)
+        data_env = data_env.to(latents_enc.device)
+        # reshape to add a channel dim
+        # data_env = data_env.unsqueeze(1).to(latents_enc.device)
+        data_env = data_env.unsqueeze(1)
+
+        latents_env = model.env_encoder(data_env)
+        latents = torch.cat((latents_enc, latents_env), 1)
+        latents = model.latent_proj(latents)
+
+        generated_samples = generate(model, diffusion_steps=diffusion_steps, latents=latents)
         real.append(x.squeeze(0).cpu())
         fake.append(generated_samples.squeeze(0).cpu())
     return real, fake
@@ -251,8 +267,27 @@ def encode_decode_batch(model, dataset, num_samples, diffusion_steps=1):
     batches = num_samples
     print(f'Generating {num_samples} samples in {batches} batches...')
     for x in tqdm(islice(dataloader, batches+1)):
-        repr_encoder = to_representation_encoder(x.to(device))
-        latents = model.encoder(repr_encoder)
+        # flatten spectrum and get envelope
+        _, flattened_x = extract_spectrum(x)
+
+        # breakpoint()
+        repr_encoder = to_representation_encoder(flattened_x.to(device))
+        latents_enc = model.encoder(repr_encoder)
+
+        # breakpoint()
+        target_len=repr_encoder.shape[-1]
+        env_len = hparams.hop * target_len
+        env_wv = x[:,:env_len]
+        _, _, data_env = extract_envelope(env_wv, target_length=target_len)
+        data_env = data_env.to(latents_enc.device)
+        # reshape to add a channel dim
+        # data_env = data_env.unsqueeze(1).to(latents_enc.device)
+        data_env = data_env.unsqueeze(1)
+
+        latents_env = model.env_encoder(data_env)
+        latents = torch.cat((latents_enc, latents_env), 1)
+        latents = model.latent_proj(latents)
+
         generated_samples = generate(model, diffusion_steps=diffusion_steps, latents=latents)
         generated_batches.append(generated_samples.squeeze(0).cpu())
     return generated_batches

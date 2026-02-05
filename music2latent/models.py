@@ -285,6 +285,209 @@ class PositionalEmbedding(torch.nn.Module):
         x = torch.cat([torch.sin(x), torch.cos(x)], dim=-1)
         return x
 
+# class EnvEncoder(nn.Module):
+#     def __init__(self):
+#         super(EnvEncoder, self).__init__()
+        
+#         layers_list = hparams.layers_list_encoder
+#         attention_list = hparams.attention_list_encoder
+#         self.layers_list = layers_list
+#         self.multipliers_list = hparams.multipliers_list
+#         input_channels = hparams.env_channels*hparams.multipliers_list[0]
+#         Conv = nn.Conv2d
+#         self.gain = FreqGain(freq_dim=hparams.hop*2)
+
+#         channels = hparams.data_channels
+#         self.conv_inp = Conv(channels, input_channels, kernel_size=3, stride=1, padding=1)
+
+#         self.freq_dim = (hparams.hop*2)//(4**hparams.freq_downsample_list.count(1))
+#         self.freq_dim = self.freq_dim//(2**hparams.freq_downsample_list.count(0))
+        
+#         # DOWNSAMPLING
+#         down_layers = []
+#         for i, (num_layers,multiplier) in enumerate(zip(layers_list,hparams.multipliers_list)):
+#             output_channels = hparams.env_channels*multiplier
+#             for num in range(num_layers):
+#                 down_layers.append(ResBlock(input_channels, output_channels, normalize=hparams.normalization, attention=attention_list[i]==1, heads=hparams.heads, use_2d=True))
+#                 input_channels = output_channels
+#             if i!=(len(layers_list)-1):
+#                 if hparams.freq_downsample_list[i]==1:
+#                     down_layers.append(DownsampleFreqConv(input_channels, normalize=hparams.pre_normalize_downsampling_encoder))
+#                 else:
+#                     down_layers.append(DownsampleConv(input_channels, use_2d=True, normalize=hparams.pre_normalize_downsampling_encoder))
+
+#         if hparams.pre_normalize_2d_to_1d:
+#             self.prenorm_1d_to_2d = nn.GroupNorm(min(input_channels//4, 32), input_channels)
+
+#         bottleneck_layers = []
+#         output_channels = hparams.bottleneck_base_channels
+#         bottleneck_layers.append(nn.Conv1d(input_channels*self.freq_dim, output_channels, kernel_size=1, stride=1, padding='same'))
+#         for i in range(hparams.num_bottleneck_layers):
+#             bottleneck_layers.append(ResBlock(output_channels, output_channels, normalize=hparams.normalization, use_2d=False))
+#         self.bottleneck_layers = nn.ModuleList(bottleneck_layers)
+
+#         self.norm_out = nn.GroupNorm(min(output_channels//4, 32), output_channels)
+#         self.activation_out = nn.SiLU()
+#         self.conv_out = nn.Conv1d(output_channels, hparams.bottleneck_channels, kernel_size=1, stride=1, padding='same')
+#         self.activation_bottleneck = nn.Tanh()
+            
+#         self.down_layers = nn.ModuleList(down_layers)
+
+
+#     def forward(self, x, extract_features=False):
+
+#         x = self.conv_inp(x)
+#         if hparams.frequency_scaling:
+#             x = self.gain(x)
+        
+#         # DOWNSAMPLING
+#         k = 0
+#         for i,num_layers in enumerate(self.layers_list):
+#             for num in range(num_layers):
+#                 x = self.down_layers[k](x)
+#                 k = k+1
+#             if i!=(len(self.layers_list)-1):
+#                 x = self.down_layers[k](x)
+#                 k = k+1
+
+#         if hparams.pre_normalize_2d_to_1d:
+#             x = self.prenorm_1d_to_2d(x)
+
+#         x = x.reshape(x.size(0), x.size(1) * x.size(2), x.size(3))
+#         if extract_features:
+#             return x
+
+#         for layer in self.bottleneck_layers:
+#             x = layer(x)
+                
+#         x = self.norm_out(x)
+#         x = self.activation_out(x)
+#         x = self.conv_out(x)
+#         x = self.activation_bottleneck(x)
+
+#         return x
+
+class EnvEncoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        layers_list = hparams.layers_list_env
+        attention_list = hparams.attention_list_encoder
+        self.layers_list = layers_list
+
+        input_channels = hparams.env_channels * hparams.multipliers_list[0]
+        # channels = hparams.data_channels
+        channels = 1  # usually 1 for waveform
+
+        # Initial projection
+        self.conv_inp = nn.Conv1d(
+            channels,
+            input_channels,
+            kernel_size=7,
+            stride=1,
+            padding=3
+        )
+
+        # -------------------------
+        # DOWNSAMPLING STACK
+        # -------------------------
+        down_layers = []
+        in_ch = input_channels
+
+        for i, (num_layers, multiplier) in enumerate(
+            zip(layers_list, hparams.multipliers_list)
+        ):
+            out_ch = hparams.env_channels * multiplier
+
+            for _ in range(num_layers):
+                down_layers.append(
+                    ResBlock(
+                        in_ch,
+                        out_ch,
+                        normalize=hparams.normalization,
+                        attention=(attention_list[i] == 1),
+                        heads=hparams.heads,
+                        use_2d=False
+                    )
+                )
+                in_ch = out_ch
+
+            if i != len(layers_list) - 1:
+                down_layers.append(
+                    DownsampleConv(
+                        in_ch,
+                        use_2d=False,
+                        normalize=hparams.pre_normalize_downsampling_encoder
+                    )
+                )
+
+        self.down_layers = nn.ModuleList(down_layers)
+
+        # -------------------------
+        # BOTTLENECK
+        # -------------------------
+        bottleneck_layers = []
+        bottleneck_ch = hparams.bottleneck_base_channels
+
+        bottleneck_layers.append(
+            nn.Conv1d(in_ch, bottleneck_ch, kernel_size=1)
+        )
+
+        for _ in range(hparams.num_bottleneck_layers):
+            bottleneck_layers.append(
+                ResBlock(
+                    bottleneck_ch,
+                    bottleneck_ch,
+                    normalize=hparams.normalization,
+                    use_2d=False
+                )
+            )
+
+        self.bottleneck_layers = nn.ModuleList(bottleneck_layers)
+
+        self.norm_out = nn.GroupNorm(
+            min(bottleneck_ch // 4, 32),
+            bottleneck_ch
+        )
+        self.activation_out = nn.SiLU()
+        self.conv_out = nn.Conv1d(
+            bottleneck_ch,
+            hparams.env_bottleneck_channels,
+            kernel_size=1
+        )
+        self.activation_bottleneck = nn.Tanh()
+
+    def forward(self, x, extract_features=False):
+        """
+        x: [B, C, T] waveform
+        """
+        # breakpoint()
+        x = self.conv_inp(x)
+
+        k = 0
+        for i, num_layers in enumerate(self.layers_list):
+            for _ in range(num_layers):
+                x = self.down_layers[k](x)
+                k += 1
+            if i != len(self.layers_list) - 1:
+                x = self.down_layers[k](x)
+                k += 1
+
+        if extract_features:
+            return x
+
+        for layer in self.bottleneck_layers:
+            x = layer(x)
+
+        # breakpoint()
+        x = self.norm_out(x)
+        x = self.activation_out(x)
+        x = self.conv_out(x)
+        x = self.activation_bottleneck(x)
+
+        return x
+
+
 class Encoder(nn.Module):
     def __init__(self):
         super(Encoder, self).__init__()
@@ -335,7 +538,6 @@ class Encoder(nn.Module):
 
 
     def forward(self, x, extract_features=False):
-
         x = self.conv_inp(x)
         if hparams.frequency_scaling:
             x = self.gain(x)
@@ -443,11 +645,23 @@ class UNet(nn.Module):
         
         self.layers_list = hparams.layers_list
         self.multipliers_list = hparams.multipliers_list
+        # input_channels = (hparams.base_channels+hparams.env_channels)*hparams.multipliers_list[0]
         input_channels = hparams.base_channels*hparams.multipliers_list[0]
         Conv = nn.Conv2d
 
         self.encoder = Encoder()
+        self.env_encoder = EnvEncoder()
         self.decoder = Decoder()
+
+        # there are two latent vectors: the spectrum and the envelope.
+        # project these down to the original latent vector that m2l 
+        # was designed for originally
+        self.latent_proj = nn.Conv1d(
+            hparams.bottleneck_channels + hparams.env_bottleneck_channels,
+            hparams.bottleneck_channels,
+            kernel_size=1
+        )
+
 
         if hparams.use_fourier:
             self.emb = GaussianFourierProjection(embedding_size=hparams.cond_channels, scale=hparams.fourier_scale)
@@ -502,7 +716,7 @@ class UNet(nn.Module):
 
 
     def forward_generator(self, latents, x, sigma=None, pyramid_latents=None):
-
+        # breakpoint()
         if sigma is None:
             sigma = hparams.sigma_max
         
@@ -521,8 +735,12 @@ class UNet(nn.Module):
         
         x = c_in*x
 
+        # breakpoint()
+
         if latents.shape == x.shape:
             latents = self.encoder(latents)
+
+        # TODO envelope latents?
 
         if pyramid_latents is None:
             pyramid_latents = self.decoder(latents)
@@ -536,9 +754,12 @@ class UNet(nn.Module):
         # DOWNSAMPLING
         k = 0
         r = 0
+        # breakpoint()
         for i,num_layers in enumerate(self.layers_list):
             for num in range(num_layers):
+                # breakpoint()
                 d = self.down_layers[k](pyramid_latents[i])
+                # print(f'{d.shape=}')
                 k = k+1
                 x = (x+d)/np.sqrt(2.)
                 x = self.down_layers[k](x, time_emb)
@@ -575,9 +796,16 @@ class UNet(nn.Module):
         return out
     
 
-    def forward(self, data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas):
-        latents = self.encoder(data_encoder)
+    def forward(self, data_encoder, data_envelope, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas):
+        # breakpoint()
+        latents_enc = self.encoder(data_encoder)
+        latents_env = self.env_encoder(data_envelope)
+        latents = torch.cat((latents_enc, latents_env), 1)
+        latents = self.latent_proj(latents)
+        # latents = latents_enc
+        # breakpoint()
         pyramid_latents = self.decoder(latents)
+        # TODO waht is this doing??? (also in utils)
         fdata = self.forward_generator(latents, noisy_samples, sigmas_step, pyramid_latents).detach()
         fdata_plus_one = self.forward_generator(latents, noisy_samples_plus_one, sigmas, pyramid_latents)
         return fdata, fdata_plus_one

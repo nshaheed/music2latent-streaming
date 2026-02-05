@@ -59,11 +59,13 @@ class HParams:
 
     # MODEL
     base_channels: int = 64                                                         # base channel number for architecture
+    env_channels: int = 8
     layers_list: List[int] = field(default_factory=lambda: [2, 2, 2, 2, 2])         # number of blocks per each resolution level
     multipliers_list: List[int] = field(default_factory=lambda: [1, 2, 4, 4, 4])    # base channels multipliers for each resolution level
     attention_list: List[int] = field(default_factory=lambda: [0, 0, 1, 1, 1])      # for each resolution, 0 if no attention is performed, 1 if attention is performed
     freq_downsample_list: List[int] = field(default_factory=lambda: [1, 0, 0, 0])   # for each resolution, 0 if frequency 4x downsampling, 1 if standard frequency 2x and time 2x downsampling
     layers_list_encoder: List[int] = field(default_factory=lambda: [1, 1, 1, 1, 1]) # number of blocks per each resolution level
+    layers_list_env: List[int] = field(default_factory=lambda: [1, 1, 1, 1]) # number of blocks per each resolution level for envelope encoder
     attention_list_encoder: List[int] = field(default_factory=lambda: [0, 0, 1, 1, 1])  # for each resolution, 0 if no attention is performed, 1 if attention is performed
     bottleneck_base_channels: int = 512                                             # base channels to use for block before/after bottleneck
     num_bottleneck_layers: int = 4                                                  # number of blocks to use before/after bottleneck
@@ -77,6 +79,7 @@ class HParams:
     min_res_dropout: int = 16                                                       # dropout is applied on equal or smaller feature map resolutions
     init_as_zero: bool = True                                                       # initialize convolution kernels before skip connections with zero-weighted kernels
     bottleneck_channels: int = 64                                                   # channels of encoder bottleneck
+    env_bottleneck_channels: int = 64                                                   # channels of encoder bottleneck
     pre_normalize_2d_to_1d: bool = True                                             # pre-normalize 2D to 1D connection in encoder
     pre_normalize_downsampling_encoder: bool = True                                 # pre-normalize downsampling layers in encoder
 

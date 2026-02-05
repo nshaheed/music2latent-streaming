@@ -7,9 +7,9 @@ compile_model = True                                                        # co
 num_workers = 16                                                            # number of dataloader workers
 multi_gpu = False                                                           # use DistributedDataParallel multi-gpu training, to be used with torchrun
 
-data_paths = ['/media/datasets/dataset1', '/media/datasets/dataset2']       # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
+data_paths = ['/scratch/users/nshaheed/mtg-jamendo-wav', '/scratch/users/nshaheed/DNS-Challenge/datasets_fullband']       # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
 data_fractions = None                                                       # list of sampling weights of each dataset (if None, equal sampling weights)
-data_path_test = '/media/datasets/test_dataset'                             # path of samples used for FAD testing (e.g. musiccaps)
+data_path_test = '/scratch/users/nshaheed/musiccaps/music_data/'                             # path of samples used for FAD testing (e.g. musiccaps)
 data_extensions = ['.wav', '.flac']                                         # list of extensions of audio files to search for in the given paths
 
 num_samples_fad = 500                                                       # number of samples that are encoded and decoded for FAD evaluation
@@ -28,7 +28,7 @@ final_lr = 0.000001                                                         # if
 warmup_steps = iters_per_epoch                                              # number of warmup steps of optimizer
 accumulate_gradients = 1                                                    # will accumulate the gradients from this number of batches befire updating
 checkpoint_path = 'checkpoints'                                             # path where to save config and checkpoints
-torch_compile_cache_dir = 'tmp/torch_compile'                               # path where to save compiled kernels
+torch_compile_cache_dir = '/scratch/groups/brg/'                               # path where to save compiled kernels
 mixed_precision = True                                                      # use mixed precision (float16)
 seed = 42                                                                   # seed for Pytorch and Numpy
 
@@ -77,6 +77,8 @@ layers_list = [2,2,2,2,2]                                                   # nu
 multipliers_list = [1,2,4,4,4]                                              # base channels multipliers for each resolution level
 attention_list = [0,0,1,1,1]                                                # for each resolution, 0 if no attention is performed, 1 if attention is performed
 freq_downsample_list = [1,0,0,0]                                            # for each resolution, 0 if frequency 4x downsampling, 1 if standard frequency 2x and time 2x downsampling
+
+env_channels = 8                                                            # number of channels to encode envelope
 
 layers_list_encoder = [1,1,1,1,1]                                           # number of blocks per each resolution level
 attention_list_encoder = [0,0,1,1,1]                                        # for each resolution, 0 if no attention is performed, 1 if attention is performed
