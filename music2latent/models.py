@@ -807,12 +807,16 @@ class UNet(nn.Module):
         # breakpoint()
         latents_enc = self.encoder(data_encoder)
         latents_env = self.env_encoder(data_envelope)
-        latents = torch.cat((latents_enc, latents_env), 1)
+        # latents = torch.cat((latents_enc, latents_env), 1)
 
         # TODO instead of doing this, just swap out the last couple layers
-        latents = self.latent_proj(latents)
-        latents = self.latent_proj_activation(latents) # convolve
-        latents = latents_enc
+        # latents = self.latent_proj(latents)
+        # latents = self.latent_proj_activation(latents) # convolve
+        # latents = latents_enc
+        
+
+        
+
         # breakpoint()
         pyramid_latents = self.decoder(latents)
         # TODO waht is this doing??? (also in utils)
