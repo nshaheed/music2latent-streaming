@@ -1,7 +1,7 @@
 #!/usr/bin/bash
-#SBATCH --job-name=train_env
-#SBATCH --output=train_env.%j.out
-#SBATCH --error=train_env.%j.err
+#SBATCH --job-name=train_relu
+#SBATCH --output=train_relu.%j.out
+#SBATCH --error=train_relu.%j.err
 #SBATCH --time=3:00:00
 #SBATCH -p hns,gpu
 #SBATCH --ntasks=1
@@ -22,6 +22,6 @@ ml load libsndfile
 # https://stackoverflow.com/questions/77442172/ssl-certificate-verify-failed-certificate-verify-failed-unable-to-get-local-is
 export SSL_CERT_FILE=$(uv run python -m certifi)
 
-uv run launch.py --config configs/config_env.py
+uv run launch.py --config configs/config_env_relu.py
 # cd music2latent
 # uv run fad_run.py

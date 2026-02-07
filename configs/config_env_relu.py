@@ -1,25 +1,18 @@
 # MAIN PARAMETERS
-batch_size = 1 # batch size
-lr = 0.0001 # learning rate
+batch_size = 16 # batch size
+lr = 0.000001 # learning rate
 total_iters = 800000 # total iterations
-iters_per_epoch = 100 # number of iterations approximately in every epoch
-compile_model = False # compile the model for faster training (will require ~10 minutes of compilation time only on first run)
-num_workers = 4 # number of dataloader workers
+iters_per_epoch = 10000 # number of iterations approximately in every epoch
+compile_model = True # compile the model for faster training (will require ~10 minutes of compilation time only on first run)
+num_workers = 16 # number of dataloader workers
 multi_gpu = False # use DistributedDataParallel multi-gpu training, to be used with torchrun
 
-data_paths = ['/scratch/users/nshaheed/dev-audio'] # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
+data_paths = ['/scratch/users/nshaheed/mtg-jamendo-wav', '/scratch/users/nshaheed/DNS-Challenge/datasets_fullband'] # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
 data_fractions = None # list of sampling weights of each dataset (if None, equal sampling weights)
 data_path_test = '/scratch/users/nshaheed/musiccaps/music_data/' # path of samples used for FAD testing (e.g. musiccaps)
 data_extensions = ['.wav', '.flac'] # list of extensions of audio files to search for in the given paths
 
-# num_samples_fad = 500 # number of samples that are encoded and decoded for FAD evaluation
-num_samples_fad = 0 # number of samples that are encoded and decoded for FAD evaluation
-
-
-
-
-
-
+num_samples_fad = 500 # number of samples that are encoded and decoded for FAD evaluation
 
 
 # TRAINING
@@ -103,6 +96,8 @@ env_bottleneck_channels = 8 # channels of encoder bottleneck
 pre_normalize_2d_to_1d = True # pre-normalize 2D to 1D connection in encoder
 pre_normalize_downsampling_encoder = True # pre-normalize downsampling layers in encoder
 
+latent_proj_activation = 'relu'
+
 
 # DIFFUSION PARAMETERS
 schedule = 'exponential' # step schedule to use ['constant', 'exponential']
@@ -119,3 +114,4 @@ rho = 7. # rho parameter for EDM framework
 use_lognormal = True # use a lognormal noise schedule during training
 p_mean = -1.1 # mean of lognormal noise schedule
 p_std = 2. # standard deviation of lognormal noise schedule
+

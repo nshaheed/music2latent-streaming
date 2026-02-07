@@ -22,5 +22,6 @@ ml load libsndfile
 export SSL_CERT_FILE=$(uv run python -m certifi)
 
 uv run launch.py --config configs/config_dev.py
+# uv run launch.py --config configs/config_env_relu.py
 # cd music2latent
 # uv run fad_run.py

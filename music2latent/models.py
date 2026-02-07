@@ -662,6 +662,13 @@ class UNet(nn.Module):
             kernel_size=1
         )
 
+        if hparams.latent_proj_activation == 'silu':
+            self.latent_proj_activation = nn.SiLU()
+        elif hparams.latent_proj_activation == 'relu':
+            self.latent_proj_activation = nn.LeakyReLU()
+        else:
+            self.latent_proj_activation = nn.Tanh()
+
 
         if hparams.use_fourier:
             self.emb = GaussianFourierProjection(embedding_size=hparams.cond_channels, scale=hparams.fourier_scale)
@@ -801,8 +808,11 @@ class UNet(nn.Module):
         latents_enc = self.encoder(data_encoder)
         latents_env = self.env_encoder(data_envelope)
         latents = torch.cat((latents_enc, latents_env), 1)
+
+        # TODO instead of doing this, just swap out the last couple layers
         latents = self.latent_proj(latents)
-        # latents = latents_enc
+        latents = self.latent_proj_activation(latents) # convolve
+        latents = latents_enc
         # breakpoint()
         pyramid_latents = self.decoder(latents)
         # TODO waht is this doing??? (also in utils)

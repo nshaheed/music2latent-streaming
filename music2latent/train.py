@@ -3,6 +3,7 @@ import os
 import shutil
 import glob
 import torch
+import wandb
 import numpy as np
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -47,6 +48,8 @@ class Trainer:
         self.get_models()
         self.switch_save_checkpoint = True
         self.step = 0
+
+        wandb.watch(self.gen, log_freq=1000)
         
         # INITIALIZE CHECKPOINT FOLDER
         if misc.get_rank()==0:
@@ -67,7 +70,6 @@ class Trainer:
             if hparams.multi_gpu:
                 fdata, fdata_plus_one = self.ddp(data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
             else:
-                breakpoint()
                 fdata, fdata_plus_one = self.gen(data_encoder, data_env, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
             
             loss_weight = get_loss_weight(sigmas, sigmas_step)
@@ -83,16 +85,14 @@ class Trainer:
         data = to_representation(flattened_wv)
         data_encoder = to_representation_encoder(flattened_wv)
 
-        # breakpoint()
         env_len = hparams.hop * hparams.data_length
         env_wv = wv[:,:env_len]
         _, _, data_env = extract_envelope(env_wv, target_length=hparams.data_length)
         # reshape to add a channel dim
         data_env = data_env.unsqueeze(1)
 
-        fig = plot_training_run(wv, flattened_wv, data_env)
-        self.writer.add_figure(f"figs/tr_steps", fig, global_step=self.it)
-        # breakpoint()
+        # fig = plot_training_run(wv, flattened_wv, data_env)
+        # self.writer.add_figure(f"figs/tr_steps", fig, global_step=self.it)
 
         step = get_step_schedule(min(self.it,hparams.total_iters))
         self.step = step
@@ -125,6 +125,7 @@ class Trainer:
 
 
         loss = loss.detach().cpu().item()
+        wandb.log({"train_log": loss})
 
         grad_norm = get_grad_norm(self.gen.parameters())
         if ((self.it+1) % hparams.accumulate_gradients==0) or (self.it+1==len(self.dl)):
@@ -188,7 +189,6 @@ class Trainer:
                 pbar = self.dl
 
             for batchi,(x) in enumerate(pbar):
-                # breakpoint()
                 self.update_learning_rate()
                 
                 loss = self.train_it(x.to(self.device))
@@ -243,6 +243,8 @@ class Trainer:
     def test_model(self):
         self.gen.eval()
         max_steps = hparams.inference_diffusion_steps
+
+        # TODO: add test step
 
         num_examples = 4
         original,reconstructed = encode_decode(self.gen, self.ds_test, num_examples)

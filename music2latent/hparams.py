@@ -82,6 +82,7 @@ class HParams:
     env_bottleneck_channels: int = 64                                                   # channels of encoder bottleneck
     pre_normalize_2d_to_1d: bool = True                                             # pre-normalize 2D to 1D connection in encoder
     pre_normalize_downsampling_encoder: bool = True                                 # pre-normalize downsampling layers in encoder
+    latent_proj_activation: str = 'tanh'                                            # type of act layer ('tanh','silu', 'relu') 
 
     # DIFFUSION PARAMETERS
     schedule: str = 'exponential'                                                   # step schedule to use ['constant', 'exponential']

@@ -224,7 +224,10 @@ def encode_decode(model, dataset, num_samples=9, diffusion_steps=1):
 
         latents_env = model.env_encoder(data_env)
         latents = torch.cat((latents_enc, latents_env), 1)
+
+        # TODO don't do this and swap instead
         latents = model.latent_proj(latents)
+        latents = model.latent_proj_activation(latents)
 
         generated_samples = generate(model, diffusion_steps=diffusion_steps, latents=latents)
         real.append(x.squeeze(0).cpu())
@@ -286,7 +289,10 @@ def encode_decode_batch(model, dataset, num_samples, diffusion_steps=1):
 
         latents_env = model.env_encoder(data_env)
         latents = torch.cat((latents_enc, latents_env), 1)
+
+        # TODO don't do this and swap out instead
         latents = model.latent_proj(latents)
+        latents = model.latent_proj_activation(latents)
 
         generated_samples = generate(model, diffusion_steps=diffusion_steps, latents=latents)
         generated_batches.append(generated_samples.squeeze(0).cpu())

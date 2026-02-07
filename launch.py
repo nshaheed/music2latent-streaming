@@ -2,8 +2,12 @@
 import torch
 import torch._dynamo
 torch._dynamo.config.automatic_dynamic_shapes = False # solves error raised when generating samples with different length
+
+import wandb
+
 import argparse
 from music2latent.config_loader import load_config
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train or run the music2latent model.")
@@ -14,4 +18,5 @@ if __name__ == "__main__":
         load_config(args.config)
 
     from music2latent.train import main
+    wandb.init(project='m2l-env')
     main()
