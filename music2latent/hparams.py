@@ -96,6 +96,9 @@ class HParams:
     p_mean: float = -1.1                                                            # mean of lognormal noise schedule
     p_std: float = 2.0                                                              # standard deviation of lognormal noise schedule
 
+    # random shit
+    test: bool = False # am I testing?
+
     def update(self, config_dict: dict):
         # make sure I can set each key as an attribute (e.g. I can call hparams.batch_size)
         for key, value in config_dict.items():

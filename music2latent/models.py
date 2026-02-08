@@ -813,9 +813,17 @@ class UNet(nn.Module):
         # latents = self.latent_proj(latents)
         # latents = self.latent_proj_activation(latents) # convolve
         # latents = latents_enc
-        
 
-        
+        # So, the latent vector shape isn't going to change from the orignal,
+        # but I'm going to take the envelope latent and just replace the first
+        # 8 dimensions of the latent vectors with this
+        # breakpoint()
+        # torch.autograd.set_detect_anomaly(True)
+        latents = latents_enc.clone()
+        latents[:,0:hparams.env_bottleneck_channels,:] = latents_env
+
+        if hparams.test:
+            latents = latents_enc
 
         # breakpoint()
         pyramid_latents = self.decoder(latents)

@@ -1,13 +1,15 @@
 # MAIN PARAMETERS
+test = True
+
 batch_size = 1 # batch size
-lr = 0.0001 # learning rate
+lr = 0.000025 # learning rate
 total_iters = 800000 # total iterations
 iters_per_epoch = 100 # number of iterations approximately in every epoch
 compile_model = False # compile the model for faster training (will require ~10 minutes of compilation time only on first run)
 num_workers = 4 # number of dataloader workers
 multi_gpu = False # use DistributedDataParallel multi-gpu training, to be used with torchrun
 
-data_paths = ['/scratch/users/nshaheed/dev-audio'] # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
+data_paths = ['/scratch/users/nshaheed/dev-audio-single'] # list of paths of training datasets (use a single-element list for a single dataset). Audio files will be recursively searched in these paths and in their sub-paths
 data_fractions = None # list of sampling weights of each dataset (if None, equal sampling weights)
 data_path_test = '/scratch/users/nshaheed/musiccaps/music_data/' # path of samples used for FAD testing (e.g. musiccaps)
 data_extensions = ['.wav', '.flac'] # list of extensions of audio files to search for in the given paths
@@ -69,7 +71,7 @@ eval_samples_path = 'eval_samples' # generated images for FAD evaluation during 
 inference_diffusion_steps = 1 # how many denoising steps to use for FAD calculation
 
 fad_models = ['vggish', 'clap'] # list of FAD models to use
-fad_workers = 16 # number of workers for FAD evaluation
+fad_workers = 4 # number of workers for FAD evaluation
 fad_background_embeddings = [f'fad_stats/{data_path_test.replace("/", "")}_{fm}.npy' for fm in fad_models] # name of fad embeddings file. If does not exist, it will be created on the first run
 
 

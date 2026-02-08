@@ -2,7 +2,7 @@
 #SBATCH --job-name=train_env
 #SBATCH --output=train_env.%j.out
 #SBATCH --error=train_env.%j.err
-#SBATCH --time=3:00:00
+#SBATCH --time=24:00:00
 #SBATCH -p hns,gpu
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-gpu=16

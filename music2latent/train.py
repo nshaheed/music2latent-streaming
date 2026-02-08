@@ -49,7 +49,7 @@ class Trainer:
         self.switch_save_checkpoint = True
         self.step = 0
 
-        wandb.watch(self.gen, log_freq=1000)
+        # wandb.watch(self.gen, log_freq=1000)
         
         # INITIALIZE CHECKPOINT FOLDER
         if misc.get_rank()==0:
@@ -71,7 +71,7 @@ class Trainer:
                 fdata, fdata_plus_one = self.ddp(data_encoder, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
             else:
                 fdata, fdata_plus_one = self.gen(data_encoder, data_env, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
-            
+
             loss_weight = get_loss_weight(sigmas, sigmas_step)
             loss = huber(fdata,fdata_plus_one,loss_weight)
         return loss
@@ -80,6 +80,9 @@ class Trainer:
     def train_it(self, wv):
         # flatten spectrum and get envelope
         _, flattened_wv = extract_spectrum(wv)
+
+        if hparams.test:
+            flattened_wv = wv
 
         # performs stft on the wavform
         data = to_representation(flattened_wv)
@@ -115,7 +118,6 @@ class Trainer:
 
         with misc.ddp_sync(self.ddp, ((self.it+1) % hparams.accumulate_gradients==0) or (self.it+1==len(self.dl))):
             loss = self.forward_pass_consistency(data_encoder, data_env, noisy_samples, noisy_samples_plus_one, sigmas_step, sigmas)
-        self.scaler.scale(loss.float()).backward()
 
         if not torch.isfinite(loss):
             raise RuntimeError("Non-finite loss")
@@ -123,9 +125,15 @@ class Trainer:
         if loss == 0:
             raise RuntimeError("Zero loss — invalid state")
 
+        if loss.float() is None:
+            print('loss is None??')
+            print(f'{loss=}')
+            print(f'{loss.float=}')
+
+        self.scaler.scale(loss.float()).backward()
+
 
         loss = loss.detach().cpu().item()
-        wandb.log({"train_log": loss})
 
         grad_norm = get_grad_norm(self.gen.parameters())
         if ((self.it+1) % hparams.accumulate_gradients==0) or (self.it+1==len(self.dl)):
@@ -140,12 +148,18 @@ class Trainer:
             self.writer.add_scalar('loss', loss, self.it)
             self.writer.add_scalar('gradient norm', grad_norm.item(), self.it)
             self.writer.add_scalar('consistency step', step, self.it)
+            wandb.log({"loss": loss, "grad_norm": grad_norm.item()}, step=self.it)
+            
 
         return loss
 
     def forward_loss(self, wv):
         ## for lr range finder
         _, flattened_wv = extract_spectrum(wv)
+
+        # if hparams.test:
+        #     flattened_wv = wv
+
         data = to_representation(flattened_wv)
         data_encoder = to_representation_encoder(flattened_wv)
 
@@ -211,9 +225,19 @@ class Trainer:
                     self.save_checkpoint(np.mean(loss_list[-g:]))
                 if hparams.enable_ema:
                     with self.ema.average_parameters():
-                        self.test_model()
+                        original, reconstructed = self.test_model()
+                        for i, (orig, recon) in enumerate(zip(original, reconstructed)):
+                            wandb.log({
+                                f"audio/{i}/orig": wandb.Audio(orig.numpy(), sample_rate=48000),
+                                f"audio/{i}/recon": wandb.Audio(recon.numpy(), sample_rate=48000),
+                            }, step=self.it)
                 else:
-                    self.test_model()
+                    original, reconstructed = self.test_model()
+                    for i, (orig, recon) in enumerate(zip(original, reconstructed)):
+                        wandb.log({
+                            f"audio/{i}/orig": wandb.Audio(orig.numpy(), sample_rate=48000),
+                            f"audio/{i}/recon": wandb.Audio(recon.numpy(), sample_rate=48000),
+                        }, step=self.it)
 
             g = 0
 
@@ -261,6 +285,7 @@ class Trainer:
             self.writer.add_figure(f"figs/{max_steps}_steps", fig, global_step=self.it)
         plt.close()
         self.gen.train()
+        return original, reconstructed
 
     def save_batch_to_wav(self, batch):
         print('Saving audio samples...')
