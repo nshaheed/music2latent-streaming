@@ -80,6 +80,7 @@ class Trainer:
     def train_it(self, wv):
         # flatten spectrum and get envelope
         _, flattened_wv = extract_spectrum(wv)
+        compress(wv)
 
         if hparams.test:
             flattened_wv = wv

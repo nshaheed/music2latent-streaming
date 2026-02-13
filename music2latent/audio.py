@@ -4,6 +4,7 @@ import numpy as np
 import torchaudio
 import librosa
 import matplotlib.pyplot as plt
+from dasp_pytorch.functional import compressor
 
 from scipy.signal import hilbert, butter, filtfilt
 from .hparams import hparams
@@ -402,6 +403,7 @@ def extract_spectrum(audio):
     # Convert to mono if stereo
     # if len(audio.shape) > 1:
     #     audio = np.mean(audio, axis=1)
+    # breakpoint()
 
     # Normalize audio
     audio = audio / torch.max(torch.abs(audio))
@@ -412,3 +414,20 @@ def extract_spectrum(audio):
     flattened_audio = audio / torch.from_numpy(envelope).to(audio.device)
 
     return audio, flattened_audio
+
+
+def compress(audio):
+    # [channel, samples]
+    breakpoint()
+    audio = audio.unsqueeze(1)
+    d = audio.device
+    audio = compressor(audio, 
+               sample_rate=48000, 
+               threshold_db=torch.tensor([-12.0]).to(d),
+               ratio=torch.tensor([100.0]).to(d),
+               attack_ms=torch.tensor([10.0]).to(d),
+               release_ms=torch.tensor([100.0]).to(d),
+               knee_db=torch.tensor([0.01]).to(d),
+               makeup_gain_db=torch.tensor([0.0]).to(d))
+
+    return audio
