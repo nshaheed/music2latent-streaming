@@ -416,18 +416,34 @@ def extract_spectrum(audio):
     return audio, flattened_audio
 
 
-def compress(audio):
-    # [channel, samples]
-    breakpoint()
+def compress(audio, sr):
+    # audio input shape: [batch, samples]
+    # audio output shape: [batch, samples]
     audio = audio.unsqueeze(1)
     d = audio.device
+
+    # repeat val along dimensions
+    def param(val):
+        return torch.tensor([val]).to(d).repeat(audio.shape[0])
+
+    # breakpoint()
     audio = compressor(audio, 
-               sample_rate=48000, 
-               threshold_db=torch.tensor([-12.0]).to(d),
-               ratio=torch.tensor([100.0]).to(d),
-               attack_ms=torch.tensor([10.0]).to(d),
-               release_ms=torch.tensor([100.0]).to(d),
-               knee_db=torch.tensor([0.01]).to(d),
-               makeup_gain_db=torch.tensor([0.0]).to(d))
+               sample_rate=sr, 
+               threshold_db=param(-60.0),
+               ratio=param(float('inf')),
+               attack_ms=param(10),
+               release_ms=param(100.0),
+               knee_db=param(0.01),
+               makeup_gain_db=param(0.0),
+               lookahead_samples=int(sr*1e-3)
+               # lookahead_samples=int(sr*1e1)
+            )
+
+    # normalize audio
+    # breakpoint()
+    audio = audio.squeeze(1)
+    peak = audio.abs().amax(dim=1, keepdim=True).clamp_min(1e-8)
+    audio = audio / peak
+
 
     return audio
