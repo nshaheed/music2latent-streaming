@@ -21,6 +21,7 @@ dependencies = [
     "pip-system-certs>=4.0",
     "certifi>=2026.1.4",
     "dasp-pytorch>=0.0.1",
+    "pyqt6>=6.10.2",
 ]
 
 [tool.uv.sources]

@@ -21,7 +21,7 @@ class EncoderDecoder:
         if load_path_inference is None:
             self.load_path_inference = load_path_inference_default
         self.get_models()
-        
+
     def get_models(self):
         gen = UNet().to(self.device)
         checkpoint = torch.load(self.load_path_inference, map_location=self.device)
@@ -51,7 +51,7 @@ class EncoderDecoder:
         if max_batch_size is None:
             max_batch_size = max_batch_size_encode
         return encode_audio_inference(path_or_audio, self, max_waveform_length, max_batch_size, device=self.device, extract_features=extract_features)
-    
+
     def decode(self, latent, denoising_steps=1, max_waveform_length=None, max_batch_size=None):
         '''
         latent: numpy array of latents to decode with shape [audio_channels, dim, length]
@@ -63,7 +63,7 @@ class EncoderDecoder:
         '''
         if max_waveform_length is None:
             max_waveform_length = max_waveform_length_decode
-        if max_batch_size is None: 
+        if max_batch_size is None:
             max_batch_size = max_batch_size_decode
         return decode_latent_inference(latent, self, max_waveform_length, max_batch_size, diffusion_steps=denoising_steps, device=self.device)
 
@@ -74,7 +74,7 @@ class EncoderDecoder:
 
 # decode samples with consistency model to real/imag STFT spectrograms
 # Parameters:
-#   model: trained consistency model 
+#   model: trained consistency model
 #   latents: latent representation with shape [audio_channels/batch_size, dim, length]
 #   diffusion_steps: number of steps
 # Returns:
@@ -121,6 +121,9 @@ def encode_audio_inference(audio_path, trainer, max_waveform_length_encode, max_
         # check if audio tensor is on cpu. if it is, move it to the device
         if audio.device.type=='cpu':
             audio = audio.to(device)
+
+    # compress audio
+
 
     # EXPERIMENTAL: crop audio to be divisible by downscaling_factor
     cropped_length = ((((audio.shape[-1]-3*hparams.hop)//hparams.hop)//downscaling_factor)*hparams.hop*downscaling_factor)+3*hparams.hop

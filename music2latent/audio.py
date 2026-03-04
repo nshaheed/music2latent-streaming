@@ -214,7 +214,7 @@ def plot_training_run(wv, flat_wv, env_wv):
     spec_wv = wv2mel(wv)
     spec_flat_wv = wv2mel(flat_wv)
 
-    fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(5, 10))    
+    fig, axs = plt.subplots(nrows=3, ncols=1, figsize=(5, 10))
 
     # breakpoint()
     axs[0].imshow(np.flip(spec_wv[0].cpu().numpy(), -2))
@@ -232,7 +232,7 @@ def plot_training_run(wv, flat_wv, env_wv):
     # 3. Interpolate env_wv to match the length of wv
     env_interp = np.interp(x_orig, x_env_current, env_wv[0][0].cpu().numpy())
 
-    # axs[2].plot(np.arange(wv.shape[-1]), wv[0].cpu().numpy())    
+    # axs[2].plot(np.arange(wv.shape[-1]), wv[0].cpu().numpy())
     # axs[3].plot(np.arange(env_wv.shape[-1]), env_wv[0][0].cpu().numpy())
 
     axs[2].plot(x_orig, wv[0].cpu().numpy(), label='Waveform', alpha=0.7)
@@ -247,7 +247,7 @@ def plot_audio_compare(wv1, wv2):
     spec3 = []
     envs = []
     wv3 = []
-    
+
     for w1, w2 in zip(wv1, wv2):
         spec1.append(wv2mel(w1.unsqueeze(0)).squeeze(0)[..., :1024])
         spec2.append(wv2mel(w2.unsqueeze(0)).squeeze(0)[..., :1024])
@@ -352,7 +352,7 @@ def extract_envelope(wv, target_length=64, cutoff_freq=30):
     # original_indices = np.linspace(0, len(smoothed_envelope)-1, len(smoothed_envelope))
     # target_indices = np.linspace(0, len(smoothed_envelope)-1, target_length)
     # resampled_envelope = np.interp(target_indices, original_indices, smoothed_envelope)
-    
+
     batch, samps = smoothed_envelope.shape
 
     original_indices = np.linspace(0, samps - 1, samps)
@@ -407,7 +407,7 @@ def extract_spectrum(audio):
 
     # Normalize audio
     audio = audio / torch.max(torch.abs(audio))
-    
+
     envelope, smooth, resamp = extract_envelope(audio)
 
     # divide audio by envelope - should flatten?
@@ -427,8 +427,8 @@ def compress(audio, sr):
         return torch.tensor([val]).to(d).repeat(audio.shape[0])
 
     # breakpoint()
-    audio = compressor(audio, 
-               sample_rate=sr, 
+    audio = compressor(audio,
+               sample_rate=sr,
                threshold_db=param(-60.0),
                ratio=param(float('inf')),
                attack_ms=param(10),
@@ -447,3 +447,89 @@ def compress(audio, sr):
 
 
     return audio
+
+def extract_envelope_np(wv, target_length=64, cutoff_freq=30):
+    """
+    Extract a fixed-length temporal envelope from numpy arr
+
+    Parameters:
+    -----------
+    wv : np.arr
+        Audio
+
+    target_length : int
+        Desired length of the output envelope (default: 2048)
+
+    cutoff_freq : float
+        Cutoff frequency for the lowpass filter in Hz (default: 30)
+
+
+    Returns:
+    --------
+    tuple
+        (original_envelope, smoothed_envelope, resampled_envelope)
+    """
+    # sample_rate, audio = wavfile.read(filepath)
+    audio = wv
+
+    # Convert to mono if stereo (shouldn't need)
+    # if len(audio.shape) > 1:
+    #     audio = np.mean(audio, axis=1)
+
+    # Normalize audio
+    # audio = audio.astype(float) / np.max(np.abs(audio))
+
+    # Calculate temporal envelope using Hilbert transform
+    analytic_signal = hilbert(audio)
+    envelope = np.abs(analytic_signal)
+
+    # assume 44.1kHz sample rate (this won't matter too much in reality as:
+    #  normalized_cutoff = 30 / 22050 = 0.00136
+    #  normalized_cutoff = 30 / 24000 = 0.00125
+    # this is only an 8.8% difference in cutoff frequency from 44.1k vs 48k
+    sample_rate = 44100
+
+    # Design and apply lowpass filter
+    nyquist = sample_rate / 2
+    normalized_cutoff = cutoff_freq / nyquist
+    b, a = butter(4, normalized_cutoff, btype='low')
+    smoothed_envelope = filtfilt(b, a, envelope)
+
+    # the nyquist frequency for 44100 is (86.13/2) = 43
+    #                       for 48000 is (93.75/2) = 47
+    # so I'm not too worried about aliasing
+
+
+    # # Resample to target length
+    # batch, samps = smoothed_envelope.shape
+
+    # original_indices = np.linspace(0, samps - 1, samps)
+    # target_indices = np.linspace(0, samps - 1, target_length)
+
+    # resampled_envelope = np.interp(
+    #     target_indices,
+    #     original_indices,
+    #     smoothed_envelope.reshape(-1, samps)
+    # ).reshape(batch, target_length)
+
+    # original_indices = np.linspace(0, len(smoothed_envelope)-1, len(smoothed_envelope))
+    # target_indices = np.linspace(0, len(smoothed_envelope)-1, target_length)
+    # resampled_envelope = np.interp(target_indices, original_indices, smoothed_envelope)
+
+    batch, samps = smoothed_envelope.shape
+
+    original_indices = np.linspace(0, samps - 1, samps)
+    target_indices = np.linspace(0, samps - 1, target_length)
+
+    resampled_envelope = np.empty((batch, target_length), dtype=smoothed_envelope.dtype)
+
+    for b in range(batch):
+        resampled_envelope[b] = np.interp(
+            target_indices,
+            original_indices,
+            smoothed_envelope[b]
+        )
+
+    # we only care about the resampled one for now
+    # resampled_envelope = torch.from_numpy(resampled_envelope).to(torch.float32).to(device)
+    return envelope, smoothed_envelope, resampled_envelope
