@@ -1,7 +1,7 @@
 # MAIN PARAMETERS
 test = True
 
-batch_size = 1 # batch size
+batch_size = 2 # batch size
 lr = 0.000025 # learning rate
 total_iters = 800000 # total iterations
 iters_per_epoch = 100 # number of iterations approximately in every epoch
