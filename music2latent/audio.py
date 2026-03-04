@@ -416,7 +416,7 @@ def extract_spectrum(audio):
     return audio, flattened_audio
 
 
-def compress(audio, sr):
+def compress(audio, sr=44100):
     # audio input shape: [batch, samples]
     # audio output shape: [batch, samples]
     audio = audio.unsqueeze(1)
